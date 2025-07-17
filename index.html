@@ -3,118 +3,88 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jane - Journal Intime IA Sécurisé</title>
+    <title>Jane - Votre Journal Intime IA</title>
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Playfair+Display:wght@700&family=Great+Vibes&display=swap" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Quicksand:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" href="images/jane_icon.png">
 </head>
 <body>
-    <div id="auth-screen">
-        <div class="security-header">
-            <div class="security-badge">🔒 Chiffrement AES-256</div>
-            <div class="language-selector">
+    <div id="auth-screen" class="container auth-container">
+        <h1 id="auth-message"></h1>
+        <div class="input-group">
+            <input type="text" id="username-input" placeholder="Nom d'utilisateur" required>
+        </div>
+        <div class="input-group">
+            <input type="password" id="pin-input" placeholder="PIN" required>
+        </div>
+        <p id="error-message" class="error-message"></p>
+        <button id="unlock-button" class="button">
+            <span class="button-text">Déverrouiller</span>
+            <img src="images/key_icon.png" alt="Key Icon" class="button-icon">
+        </button>
+    </div>
+
+    <div id="journal-app" class="container journal-container hidden">
+        <header>
+            <div class="user-info">
+                <img src="images/user_avatar.png" alt="User Avatar" class="avatar">
+                <span id="username-display"></span>
+            </div>
+            <div class="header-buttons">
                 <select id="language-select">
                     <option value="fr">Français</option>
                     <option value="en">English</option>
                 </select>
-            </div>
-        </div>
-        
-        <div class="logo-container">
-            <div class="jane-logo">
-                <span class="logo-text">JANE</span>
-                <span class="logo-ia">AI</span>
-            </div>
-            <p class="logo-tagline">Votre confidente numérique</p>
-        </div>
-        
-        <div class="auth-container">
-            <h2>Espace Personnel Sécurisé</h2>
-            <p id="auth-message">Veuillez vous identifier</p>
-            
-            <div class="input-group">
-                <input type="text" id="username-input" placeholder="Nom d'utilisateur unique" required>
-                <input type="password" id="pin-input" placeholder="Code PIN (4 chiffres)" required>
-                <button id="unlock-button" class="auth-button">
-                    <span class="button-text">Ouvrir mon journal</span>
-                    <span class="button-icon">→</span>
+                <button id="clear-history-button" class="icon-button" title="Effacer l'historique">
+                    <img src="images/clear_icon.png" alt="Clear History">
                 </button>
-            </div>
-            
-            <p id="error-message" class="error-text"></p>
-        </div>
-        
-        <div class="security-footer">
-            <p>Toutes vos données sont chiffrées localement</p>
-        </div>
-    </div>
-
-    <div id="journal-app" class="hidden">
-        <header class="app-header">
-            <div class="header-left">
-                <div class="app-logo-small">
-                    <span class="logo-text">JANE</span><span class="logo-ia-small">AI</span>
-                </div>
-                <div class="user-greeting">
-                    <h1>Mon Journal Intime</h1>
-                    <p>Connecté en tant que <span id="current-user"></span></p>
-                </div>
-            </div>
-            <div class="header-actions">
-                <button id="logout-button" class="icon-button">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                        <polyline points="16 17 21 12 16 7"></polyline>
-                        <line x1="21" y1="12" x2="9" y2="12"></line>
-                    </svg>
+                <button id="secret-journal-button" class="icon-button" title="Journal secret">
+                    <img src="images/lock_icon.png" alt="Secret Journal">
+                </button>
+                <button id="logout-button" class="icon-button" title="Déconnexion">
+                    <img src="images/logout_icon.png" alt="Logout">
                 </button>
             </div>
         </header>
 
-        <main id="chat-container">
-            <div id="chat-messages"></div>
-            <div id="jane-options-container" class="options-container hidden"></div>
+        <main id="messages-container" class="messages-container">
+            </main>
 
-            <div id="secret-journal-view" class="secret-journal-view hidden">
-                <h3 id="journal-view-title">Mon Carnet Secret</h3>
-                <div class="secret-pin-entry">
-                    <input type="password" id="secret-pin-input" placeholder="PIN pour accès" maxlength="4">
-                    <button id="verify-secret-pin-button" class="auth-button small">
-                        <span class="button-text">Accéder</span>
-                    </button>
-                    <p id="secret-pin-error" class="error-text"></p>
-                </div>
-                <div id="secret-journal-content" class="hidden">
-                    <div id="journal-dates-list" class="journal-dates-list"></div>
-                    <div id="journal-selected-day-content" class="journal-selected-day-content"></div>
-                </div>
-                <button id="close-secret-journal" class="icon-button close-button">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-x"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                </button>
+        <div id="jane-options" class="jane-options hidden">
             </div>
-        </main>
 
-        <footer class="input-area">
-            <div class="input-wrapper">
-                <textarea id="journal-input" placeholder="Écrivez votre entrée de journal ici..." rows="1"></textarea>
-                <div class="input-buttons">
-                    <button id="microphone-button" class="icon-button" title="Enregistrement vocal">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-                            <line x1="12" y1="19" x2="12" y2="23"></line>
-                            <line x1="8" y1="23" x2="16" y2="23"></line>
-                        </svg>
-                    </button>
-                    <button id="send-button" class="icon-button primary" title="Envoyer">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                            <line x1="22" y1="2" x2="11" y2="13"></line>
-                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                        </svg>
-                    </button>
-                </div>
-            </div>
+        <footer>
+            <textarea id="journal-input" placeholder="Écrivez votre pensée ou utilisez le micro..." rows="1"></textarea>
+            <button id="microphone-button" class="icon-button mic-button">
+                <img src="images/mic_icon.png" alt="Microphone">
+            </button>
+            <button id="send-button" class="icon-button send-button">
+                <img src="images/send_icon.png" alt="Envoyer">
+            </button>
         </footer>
+    </div>
+
+    <div id="secret-journal-view" class="container secret-journal-container hidden">
+        <header>
+            <button id="back-to-journal-button" class="icon-button" title="Retour au journal">
+                <img src="images/back_icon.png" alt="Back">
+            </button>
+            <h2>Journal Secret</h2>
+        </header>
+        <main>
+            <div class="journal-nav">
+                <button id="prev-day-button" class="icon-button"><img src="images/arrow_left.png" alt="Previous Day"></button>
+                <span id="current-date-display"></span>
+                <button id="next-day-button" class="icon-button"><img src="images/arrow_right.png" alt="Next Day"></button>
+            </div>
+            <form id="secret-journal-form">
+                <textarea id="journal-entry-text" placeholder="Écrivez vos pensées secrètes ici..."></textarea>
+                <button type="button" id="save-entry-button" class="button">Sauvegarder</button>
+            </form>
+            <h3>Mes Entrées</h3>
+            <ul id="journal-entries-container" class="journal-entries-list">
+                </ul>
+        </main>
     </div>
 
     <script src="script.js"></script>
