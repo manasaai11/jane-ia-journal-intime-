@@ -25,60 +25,371 @@ document.addEventListener('DOMContentLoaded', () => {
             this.authMessage = document.getElementById('auth-message');
             this.errorMessage = document.getElementById('error-message');
 
-            // Éléments du journal
+            // Éléments de l'application principale
+            this.usernameDisplay = document.getElementById('username-display');
+            this.messagesContainer = document.getElementById('messages-container');
             this.journalInput = document.getElementById('journal-input');
             this.sendButton = document.getElementById('send-button');
-            this.messagesContainer = document.getElementById('messages-container');
-            this.usernameDisplay = document.getElementById('username-display');
-            this.logoutButton = document.getElementById('logout-button');
-            this.clearHistoryButton = document.getElementById('clear-history-button');
             this.microphoneButton = document.getElementById('microphone-button');
-            this.languageSelect = document.getElementById('language-select');
-            this.janeOptionsContainer = document.getElementById('jane-options');
+            this.clearHistoryButton = document.getElementById('clear-history-button');
+            this.logoutButton = document.getElementById('logout-button');
             this.secretJournalButton = document.getElementById('secret-journal-button');
+            this.janeOptionsDiv = document.getElementById('jane-options');
+            this.languageSelect = document.getElementById('language-select');
 
-            // Éléments du carnet secret
+            // Éléments du journal secret
             this.secretJournalView = document.getElementById('secret-journal-view');
             this.backToJournalButton = document.getElementById('back-to-journal-button');
-            this.journalEntriesContainer = document.getElementById('journal-entries-container');
             this.journalEntryText = document.getElementById('journal-entry-text');
             this.saveEntryButton = document.getElementById('save-entry-button');
-            this.currentDateDisplay = document.getElementById('current-date-display');
+            this.journalEntriesContainer = document.getElementById('journal-entries-container');
             this.prevDayButton = document.getElementById('prev-day-button');
             this.nextDayButton = document.getElementById('next-day-button');
-            this.secretJournalForm = document.getElementById('secret-journal-form');
+            this.currentDateDisplay = document.getElementById('current-date-display');
         }
 
         initEvents() {
             this.unlockButton.addEventListener('click', () => this.handleAuth());
+            this.usernameInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') this.handleAuth();
+            });
             this.pinInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') this.handleAuth();
             });
-            this.sendButton.addEventListener('click', () => this.handleSendMessage());
+
+            this.sendButton.addEventListener('click', () => this.sendMessage());
             this.journalInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') this.handleSendMessage();
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    this.sendMessage();
+                }
             });
-            this.journalInput.addEventListener('input', () => this.adjustTextareaHeight());
-            this.logoutButton.addEventListener('click', () => this.logout());
-            this.clearHistoryButton.addEventListener('click', () => this.clearConversationHistory());
+            this.journalInput.addEventListener('input', () => {
+                this.journalInput.style.height = 'auto';
+                this.journalInput.style.height = this.journalInput.scrollHeight + 'px';
+            });
+
+
             this.microphoneButton.addEventListener('click', () => this.toggleSpeechRecognition());
-            this.languageSelect.addEventListener('change', (e) => this.changeLanguage(e.target.value));
+            this.clearHistoryButton.addEventListener('click', () => this.clearConversationHistory());
+            this.logoutButton.addEventListener('click', () => this.logout());
             this.secretJournalButton.addEventListener('click', () => this.showSecretJournal());
             this.backToJournalButton.addEventListener('click', () => this.hideSecretJournal());
             this.saveEntryButton.addEventListener('click', () => this.saveJournalEntry());
-            this.prevDayButton.addEventListener('click', () => this.navigateJournalDay(-1));
-            this.nextDayButton.addEventListener('click', () => this.navigateJournalDay(1));
+            this.prevDayButton.addEventListener('click', () => this.changeJournalDate(-1));
+            this.nextDayButton.addEventListener('click', () => this.changeJournalDate(1));
+            this.languageSelect.addEventListener('change', (e) => this.changeLanguage(e.target.value));
 
-            // Gestion de l'affichage des options de Jane
-            this.janeOptionsContainer.addEventListener('click', (e) => {
-                const target = e.target.closest('.jane-option-button');
-                if (target && target.dataset.optionId) {
-                    this.handleOptionSelection(target.dataset.optionId);
+            this.journalEntriesContainer.addEventListener('click', (e) => {
+                if (e.target.tagName === 'A' && e.target.closest('.journal-entry-item')) {
+                    e.preventDefault();
+                    const date = e.target.dataset.date;
+                    this.loadJournalEntryForDate(date);
                 }
             });
         }
 
-        // --- AUTHENTIFICATION ---
+        loadJaneResponses() {
+            // Définition de toutes les réponses et messages de Jane, localisés
+            return {
+                fr: {
+                    auth: {
+                        welcome: "Bienvenue sur Jane. Connectez-vous ou créez un compte.",
+                        usernamePlaceholder: "Nom d'utilisateur",
+                        pinPlaceholder: "PIN",
+                        unlockButton: "Déverrouiller",
+                        invalidCredentials: "Nom d'utilisateur ou PIN incorrect."
+                    },
+                    journal: {
+                        welcomeMessage: "Bonjour [NomUtilisateur] ! Je suis Jane, votre journal intime IA. N'hésitez pas à me confier vos pensées.",
+                        clearHistoryConfirm: "Es-tu sûr(e) de vouloir effacer toute notre conversation ? Cela ne supprimera pas tes entrées de journal secret.",
+                        clearedHistory: "D'accord, l'historique de notre conversation a été effacé.",
+                        logoutConfirm: "Es-tu sûr(e) de vouloir te déconnecter ?",
+                        loggedOut: "Déconnecté. À bientôt !",
+                        typingIndicator: "Jane est en train de réfléchir...",
+                        secretJournalTitle: "Journal Secret",
+                        secretJournalPlaceholder: "Écrivez vos pensées secrètes ici...",
+                        saveButton: "Sauvegarder",
+                        entrySaved: "Entrée sauvegardée avec succès !",
+                        noEntries: "Aucune entrée pour ce jour.",
+                        selectDate: "Sélectionnez une date pour voir ou ajouter une entrée."
+                    },
+                    recognition: {
+                        defaultPlaceholder: "Écrivez votre pensée ou utilisez le micro...",
+                        listening: "J'écoute...",
+                        speechError: "Désolé, je n'ai pas compris. Peux-tu répéter ?",
+                        errorResponse: "Désolé, il y a eu un problème technique. Veuillez réessayer plus tard."
+                    },
+                    options: {
+                        initial: {
+                            prompt: "Comment puis-je t'aider aujourd'hui ?",
+                            options: [
+                                { text: "Parle-moi de mes émotions", action: "emotions" },
+                                { text: "Donne-moi des conseils", action: "advice" },
+                                { text: "Je veux juste discuter", action: "chat" }
+                            ]
+                        },
+                        emotions: {
+                            prompt: "Dis-moi ce qui te préoccupe. Je suis là pour écouter sans jugement.",
+                            options: [
+                                { text: "Je me sens triste", action: "sad" },
+                                { text: "Je suis stressé(e)", action: "stressed" },
+                                { text: "Je suis en colère", action: "angry" },
+                                { text: "Autre...", action: "other_emotion" },
+                                { text: "Retour", action: "back" }
+                            ]
+                        },
+                        sad: {
+                            prompt: "Je comprends que tu te sentes triste. Parfois, en parler aide. Qu'est-ce qui te rend triste ?",
+                            options: [{ text: "J'ai besoin de réconfort", action: "comfort_sad" }, { text: "Que puis-je faire ?", action: "action_sad" }, { text: "Retour", action: "back" }]
+                        },
+                        stressed: {
+                            prompt: "Le stress est lourd à porter. Quelle est la source de ton stress ?",
+                            options: [{ text: "Aide à gérer le stress", action: "manage_stress" }, { text: "Relaxation", action: "relax" }, { text: "Retour", action: "back" }]
+                        },
+                        angry: {
+                            prompt: "La colère est une émotion puissante. Qu'est-ce qui te met en colère ?",
+                            options: [{ text: "Comment gérer ma colère ?", action: "manage_anger" }, { text: "Exprime-toi", action: "express_anger" }, { text: "Retour", action: "back" }]
+                        },
+                        other_emotion: {
+                            prompt: "Toutes les émotions sont valides. Décris-moi ce que tu ressens.",
+                            options: [{ text: "Retour", action: "back" }]
+                        },
+                        comfort_sad: {
+                            prompt: "Je suis là pour toi. Souviens-toi que tes sentiments sont valides et que tu es fort(e). Concentre-toi sur de petits plaisirs aujourd'hui.",
+                            options: [{ text: "Merci Jane", action: "thanks_jane" }, { text: "Autre conseil", action: "another_advice_sad" }, { text: "Retour", action: "back" }]
+                        },
+                        action_sad: {
+                            prompt: "Parfois, une petite action peut aider. Essaye de faire une courte promenade, écouter de la musique apaisante, ou écrire ce que tu ressens.",
+                            options: [{ text: "Merci Jane", action: "thanks_jane" }, { text: "Autre conseil", action: "another_advice_sad" }, { text: "Retour", action: "back" }]
+                        },
+                        manage_stress: {
+                            prompt: "La respiration profonde est une technique simple et efficace. Inspire lentement par le nez, retiens quelques secondes, puis expire lentement par la bouche.",
+                            options: [{ text: "Autre technique", action: "another_stress_tech" }, { text: "Retour", action: "back" }]
+                        },
+                        relax: {
+                            prompt: "Imagine un endroit calme et paisible. Concentre-toi sur les détails : les sons, les odeurs, les sensations. Laisse la tension s'échapper.",
+                            options: [{ text: "Autre technique", action: "another_relax_tech" }, { text: "Retour", action: "back" }]
+                        },
+                        manage_anger: {
+                            prompt: "Quand la colère monte, prends une pause. Éloigne-toi de la situation, respire profondément, et essaie de voir la situation sous un autre angle.",
+                            options: [{ text: "Autre technique", action: "another_anger_tech" }, { text: "Retour", action: "back" }]
+                        },
+                        express_anger: {
+                            prompt: "Écrire tes pensées peut être très libérateur. Décris tout ce qui te met en colère sans filtre. Cela peut t'aider à y voir plus clair.",
+                            options: [{ text: "Autre technique", action: "another_express_anger_tech" }, { text: "Retour", action: "back" }]
+                        },
+                        advice: {
+                            prompt: "Dans quel domaine souhaites-tu des conseils ?",
+                            options: [
+                                { text: "Bien-être", action: "wellness_advice" },
+                                { text: "Productivité", action: "productivity_advice" },
+                                { text: "Relations", action: "relations_advice" },
+                                { text: "Retour", action: "back" }
+                            ]
+                        },
+                        chat: {
+                            prompt: "Super ! Je suis là pour discuter de tout ce que tu veux. Pose-moi une question ou raconte-moi ta journée !",
+                            options: [{ text: "Retour", action: "back" }]
+                        },
+                        // Réponses génériques pour les retours
+                        thanks_jane: {
+                            prompt: "De rien ! Je suis là pour ça.",
+                            options: [{ text: "Autre chose ?", action: "initial" }]
+                        },
+                        another_advice_sad: {
+                            prompt: "Un autre conseil pour la tristesse ? Écoute ta chanson préférée, ou regarde une vidéo qui te fait rire.",
+                            options: [{ text: "Merci Jane", action: "thanks_jane" }, { text: "Retour", action: "back" }]
+                        },
+                        another_stress_tech: {
+                            prompt: "Pour le stress, essaye de te déconnecter pendant 15 minutes. Fais quelque chose que tu aimes : lire, dessiner, écouter de la musique.",
+                            options: [{ text: "Retour", action: "back" }]
+                        },
+                        another_relax_tech: {
+                            prompt: "Une autre technique de relaxation est la méditation guidée. Il existe de nombreuses applications ou vidéos gratuites qui peuvent t'aider.",
+                            options: [{ text: "Retour", action: "back" }]
+                        },
+                        another_anger_tech: {
+                            prompt: "Pour la colère, essaie de faire de l'exercice physique. Cela peut aider à libérer l'énergie et la tension accumulées.",
+                            options: [{ text: "Retour", action: "back" }]
+                        },
+                        another_express_anger_tech: {
+                            prompt: "Si tu as du mal à exprimer ta colère, dessine-la, ou trouve une activité créative qui te permette de canaliser cette énergie.",
+                            options: [{ text: "Retour", action: "back" }]
+                        },
+                        wellness_advice: {
+                            prompt: "Le bien-être passe par le sommeil, l'alimentation et l'activité physique. Assure-toi d'avoir un bon équilibre dans ces trois domaines.",
+                            options: [{ text: "Retour", action: "back" }]
+                        },
+                        productivity_advice: {
+                            prompt: "La technique Pomodoro peut t'aider : travaille par périodes de 25 minutes, suivies de 5 minutes de pause. Cela améliore la concentration.",
+                            options: [{ text: "Retour", action: "back" }]
+                        },
+                        relations_advice: {
+                            prompt: "Pour de meilleures relations, pratique l'écoute active : écoute vraiment ce que l'autre dit, sans interrompre et sans juger.",
+                            options: [{ text: "Retour", action: "back" }]
+                        },
+                        back: { // Nouvelle action générique pour "Retour"
+                            prompt: "D'accord, que veux-tu faire d'autre ?",
+                            options: [
+                                { text: "Parle-moi de mes émotions", action: "emotions" },
+                                { text: "Donne-moi des conseils", action: "advice" },
+                                { text: "Je veux juste discuter", action: "chat" }
+                            ]
+                        }
+                    }
+                },
+                en: {
+                    auth: {
+                        welcome: "Welcome to Jane. Log in or create an account.",
+                        usernamePlaceholder: "Username",
+                        pinPlaceholder: "PIN",
+                        unlockButton: "Unlock",
+                        invalidCredentials: "Incorrect username or PIN."
+                    },
+                    journal: {
+                        welcomeMessage: "Hello [Username]! I'm Jane, your AI diary. Feel free to confide in me.",
+                        clearHistoryConfirm: "Are you sure you want to clear our entire conversation? This will not delete your secret journal entries.",
+                        clearedHistory: "Okay, our conversation history has been cleared.",
+                        logoutConfirm: "Are you sure you want to log out?",
+                        loggedOut: "Logged out. See you soon!",
+                        typingIndicator: "Jane is thinking...",
+                        secretJournalTitle: "Secret Journal",
+                        secretJournalPlaceholder: "Write your secret thoughts here...",
+                        saveButton: "Save",
+                        entrySaved: "Entry saved successfully!",
+                        noEntries: "No entries for this day.",
+                        selectDate: "Select a date to view or add an entry."
+                    },
+                    recognition: {
+                        defaultPlaceholder: "Write your thought or use the mic...",
+                        listening: "Listening...",
+                        speechError: "Sorry, I didn't understand. Can you repeat?",
+                        errorResponse: "Sorry, there was a technical problem. Please try again later."
+                    },
+                    options: {
+                        initial: {
+                            prompt: "How can I help you today?",
+                            options: [
+                                { text: "Tell me about my emotions", action: "emotions" },
+                                { text: "Give me some advice", action: "advice" },
+                                { text: "I just want to chat", action: "chat" }
+                            ]
+                        },
+                        emotions: {
+                            prompt: "Tell me what's bothering you. I'm here to listen without judgment.",
+                            options: [
+                                { text: "I feel sad", action: "sad" },
+                                { text: "I'm stressed", action: "stressed" },
+                                { text: "I'm angry", action: "angry" },
+                                { text: "Other...", action: "other_emotion" },
+                                { text: "Back", action: "back" }
+                            ]
+                        },
+                        sad: {
+                            prompt: "I understand you feel sad. Sometimes, talking about it helps. What makes you sad?",
+                            options: [{ text: "I need comfort", action: "comfort_sad" }, { text: "What can I do?", action: "action_sad" }, { text: "Back", action: "back" }]
+                        },
+                        stressed: {
+                            prompt: "Stress is heavy to carry. What is the source of your stress?",
+                            options: [{ text: "Help manage stress", action: "manage_stress" }, { text: "Relaxation", action: "relax" }, { text: "Back", action: "back" }]
+                        },
+                        angry: {
+                            prompt: "Anger is a powerful emotion. What makes you angry?",
+                            options: [{ text: "How to manage my anger?", action: "manage_anger" }, { text: "Express yourself", action: "express_anger" }, { text: "Back", action: "back" }]
+                        },
+                        other_emotion: {
+                            prompt: "All emotions are valid. Describe to me what you're feeling.",
+                            options: [{ text: "Back", action: "back" }]
+                        },
+                        comfort_sad: {
+                            prompt: "I'm here for you. Remember that your feelings are valid and you are strong. Focus on small pleasures today.",
+                            options: [{ text: "Thank you Jane", action: "thanks_jane" }, { text: "Another tip", action: "another_advice_sad" }, { text: "Back", action: "back" }]
+                        },
+                        action_sad: {
+                            prompt: "Sometimes, a small action can help. Try taking a short walk, listening to soothing music, or writing down what you feel.",
+                            options: [{ text: "Thank you Jane", action: "thanks_jane" }, { text: "Another tip", action: "another_advice_sad" }, { text: "Back", action: "back" }]
+                        },
+                        manage_stress: {
+                            prompt: "Deep breathing is a simple and effective technique. Inhale slowly through your nose, hold for a few seconds, then exhale slowly through your mouth.",
+                            options: [{ text: "Another technique", action: "another_stress_tech" }, { text: "Back", action: "back" }]
+                        },
+                        relax: {
+                            prompt: "Imagine a calm and peaceful place. Focus on the details: sounds, smells, sensations. Let the tension escape.",
+                            options: [{ text: "Another technique", action: "another_relax_tech" }, { text: "Back", action: "back" }]
+                        },
+                        manage_anger: {
+                            prompt: "When anger rises, take a break. Step away from the situation, breathe deeply, and try to see the situation from another perspective.",
+                            options: [{ text: "Another technique", action: "another_anger_tech" }, { text: "Back", action: "back" }]
+                        },
+                        express_anger: {
+                            prompt: "Writing down your thoughts can be very liberating. Describe everything that makes you angry without filter. This can help you gain clarity.",
+                            options: [{ text: "Another technique", action: "another_express_anger_tech" }, { text: "Back", action: "back" }]
+                        },
+                        advice: {
+                            prompt: "In what area do you need advice?",
+                            options: [
+                                { text: "Well-being", action: "wellness_advice" },
+                                { text: "Productivity", action: "productivity_advice" },
+                                { text: "Relationships", action: "relations_advice" },
+                                { text: "Back", action: "back" }
+                            ]
+                        },
+                        chat: {
+                            prompt: "Great! I'm here to chat about anything you want. Ask me a question or tell me about your day!",
+                            options: [{ text: "Back", action: "back" }]
+                        },
+                        // Generic responses for going back
+                        thanks_jane: {
+                            prompt: "You're welcome! That's what I'm here for.",
+                            options: [{ text: "Anything else?", action: "initial" }]
+                        },
+                        another_advice_sad: {
+                            prompt: "Another tip for sadness? Listen to your favorite song, or watch a video that makes you laugh.",
+                            options: [{ text: "Thank you Jane", action: "thanks_jane" }, { text: "Back", action: "back" }]
+                        },
+                        another_stress_tech: {
+                            prompt: "For stress, try to disconnect for 15 minutes. Do something you enjoy: read, draw, listen to music.",
+                            options: [{ text: "Back", action: "back" }]
+                        },
+                        another_relax_tech: {
+                            prompt: "Another relaxation technique is guided meditation. There are many free apps or videos that can help you.",
+                            options: [{ text: "Back", action: "back" }]
+                        },
+                        another_anger_tech: {
+                            prompt: "For anger, try physical exercise. It can help release accumulated energy and tension.",
+                            options: [{ text: "Back", action: "back" }]
+                        },
+                        another_express_anger_tech: {
+                            prompt: "If you struggle to express your anger, draw it, or find a creative activity that allows you to channel that energy.",
+                            options: [{ text: "Back", action: "back" }]
+                        },
+                        wellness_advice: {
+                            prompt: "Well-being involves sleep, diet, and physical activity. Make sure you have a good balance in these three areas.",
+                            options: [{ text: "Back", action: "back" }]
+                        },
+                        productivity_advice: {
+                            prompt: "The Pomodoro Technique can help: work in 25-minute periods, followed by 5-minute breaks. This improves concentration.",
+                            options: [{ text: "Back", action: "back" }]
+                        },
+                        relations_advice: {
+                            prompt: "For better relationships, practice active listening: truly listen to what the other person is saying, without interrupting or judging.",
+                            options: [{ text: "Back", action: "back" }]
+                        },
+                        back: { // New generic action for "Back"
+                            prompt: "Okay, what else would you like to do?",
+                            options: [
+                                { text: "Tell me about my emotions", action: "emotions" },
+                                { text: "Give me some advice", action: "advice" },
+                                { text: "I just want to chat", action: "chat" }
+                            ]
+                        }
+                    }
+                }
+            };
+        }
+
+        // --- Authentification ---
         checkAuth() {
             const storedUser = localStorage.getItem('currentUser');
             if (storedUser) {
@@ -93,568 +404,375 @@ document.addEventListener('DOMContentLoaded', () => {
             this.authScreen.classList.remove('hidden');
             this.journalApp.classList.add('hidden');
             this.secretJournalView.classList.add('hidden');
-            this.usernameInput.value = '';
-            this.pinInput.value = '';
             this.authMessage.textContent = this.janeResponses[this.currentLanguage].auth.welcome;
-            this.errorMessage.textContent = '';
         }
 
-        showJournalApp() {
-            this.authScreen.classList.add('hidden');
-            this.journalApp.classList.remove('hidden');
-            this.usernameDisplay.textContent = this.currentUser.username;
-            this.loadConversationHistory(); // Charge l'historique de conversation de l'utilisateur
-            this.loadJournalEntries(); // Charge les entrées du carnet secret
-            this.showMainOptions(); // Affiche les options principales
-            this.adjustTextareaHeight();
-            this.journalInput.focus();
-        }
-
-        handleAuth() {
+        async handleAuth() {
             const username = this.usernameInput.value.trim();
             const pin = this.pinInput.value.trim();
 
-            if (username === '' || pin === '') {
-                this.errorMessage.textContent = this.janeResponses[this.currentLanguage].auth.emptyFields;
+            this.errorMessage.textContent = ''; // Clear previous error messages
+
+            if (!username || !pin) {
+                this.errorMessage.textContent = this.janeResponses[this.currentLanguage].auth.invalidCredentials;
                 return;
             }
 
-            let users = JSON.parse(localStorage.getItem('users') || '{}');
+            const userIdentifier = `${username}:${pin}`;
+            const users = JSON.parse(localStorage.getItem('users') || '{}');
 
-            if (users[username]) {
-                // Utilisateur existant
-                if (users[username].pin === pin) {
-                    this.currentUser = { username: username, pin: pin };
-                    localStorage.setItem('currentUser', JSON.stringify(this.currentUser));
-                    this.showJournalApp();
-                } else {
-                    this.errorMessage.textContent = this.janeResponses[this.currentLanguage].auth.invalidPin;
-                }
-            } else {
-                // Nouvel utilisateur
+            if (users[userIdentifier]) {
+                // User exists, log in
                 this.currentUser = { username: username, pin: pin };
-                users[username] = this.currentUser;
-                localStorage.setItem('users', JSON.stringify(users));
                 localStorage.setItem('currentUser', JSON.stringify(this.currentUser));
                 this.showJournalApp();
+            } else {
+                // New user, create account
+                users[userIdentifier] = {
+                    conversationHistory: [],
+                    secretJournalEntries: {}
+                };
+                localStorage.setItem('users', JSON.stringify(users));
+                this.currentUser = { username: username, pin: pin };
+                localStorage.setItem('currentUser', JSON.stringify(this.currentUser));
+                this.showJournalApp();
+                this.addJaneMessage(this.janeResponses[this.currentLanguage].journal.welcomeMessage.replace('[NomUtilisateur]', username));
             }
         }
 
         logout() {
-            this.currentUser = null;
-            localStorage.removeItem('currentUser');
-            localStorage.removeItem(`conversationHistory_${this.currentUser ? this.currentUser.username : 'default'}`);
-            this.conversationHistory = []; // Vide l'historique en mémoire
-            this.showAuthScreen();
+            if (confirm(this.janeResponses[this.currentLanguage].journal.logoutConfirm)) {
+                localStorage.removeItem('currentUser');
+                this.currentUser = null;
+                this.conversationHistory = []; // Efface l'historique de la session actuelle
+                this.showAuthScreen();
+                this.journalInput.value = ''; // Clear input field
+                this.addJaneMessage(this.janeResponses[this.currentLanguage].journal.loggedOut);
+            }
         }
 
-        // --- GESTION DES MESSAGES ET DE L'HISTORIQUE ---
+        // --- Affichage et Messages ---
+        showJournalApp() {
+            this.authScreen.classList.add('hidden');
+            this.journalApp.classList.remove('hidden');
+            this.secretJournalView.classList.add('hidden');
+            this.usernameDisplay.textContent = this.currentUser ? this.currentUser.username : 'Utilisateur';
+            this.languageSelect.value = this.currentLanguage; // Set correct language in select
+            this.loadConversationHistory();
+            this.showMainOptions(); // Affiche les options initiales après connexion
+        }
+
         addMessage(text, sender) {
-            const messageElement = document.createElement('div');
-            messageElement.classList.add('message', `${sender}-message`);
-            messageElement.textContent = text;
-            this.messagesContainer.appendChild(messageElement);
-            this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight; // Scroll vers le bas
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', `${sender}-message`);
+            messageDiv.textContent = text;
+            this.messagesContainer.appendChild(messageDiv);
+            this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight; // Scroll to bottom
         }
 
-        adjustTextareaHeight() {
-            this.journalInput.style.height = 'auto'; // Réinitialise la hauteur
-            this.journalInput.style.height = this.journalInput.scrollHeight + 'px'; // Ajuste à la hauteur du contenu
+        addJaneMessage(text) {
+            this.addMessage(text, 'jane');
+            this.lastJaneResponse = text; // Mémorise la dernière réponse de Jane
         }
 
-        showThinking() {
+        addUserMessage(text) {
+            this.addMessage(text, 'user');
+        }
+
+        // --- Envoi de Messages (IA) ---
+        async sendMessage() {
+            const userMessage = this.journalInput.value.trim();
+            if (!userMessage) return;
+
+            this.addUserMessage(userMessage);
+            this.journalInput.value = ''; // Clear input immediately
+            this.journalInput.style.height = 'auto'; // Reset height
+
+            // Ajoute le message de l'utilisateur à l'historique de conversation
+            this.conversationHistory.push({ sender: 'user', message: userMessage, timestamp: new Date().toISOString() });
+
+            // Ajoute l'indicateur de réflexion
             const thinkingMsg = document.createElement('div');
             thinkingMsg.classList.add('message', 'jane-message', 'thinking-message');
-            thinkingMsg.textContent = '...';
+            thinkingMsg.textContent = this.janeResponses[this.currentLanguage].journal.typingIndicator;
             this.messagesContainer.appendChild(thinkingMsg);
             this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
-            return thinkingMsg;
-        }
 
-        async handleSendMessage() {
-            const message = this.journalInput.value.trim();
-            if (!message || !this.currentUser) return;
+            try {
+                // Construire l'historique pour l'API OpenAI
+                const messagesForApi = this.conversationHistory.map(entry => ({
+                    role: entry.sender === 'user' ? 'user' : 'assistant',
+                    content: entry.message
+                }));
 
-            // Masque les options quand l'utilisateur écrit
-            this.janeOptionsContainer.classList.add('hidden');
-            this.janeOptionsContainer.innerHTML = ''; // Vide pour qu'elles ne réapparaissent pas instantanément
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ messages: messagesForApi }),
+                });
 
-            this.addMessage(message, 'user');
-            this.journalInput.value = '';
-            this.adjustTextareaHeight();
+                const data = await response.json();
 
-            this.conversationHistory.push({ sender: 'user', message: message, timestamp: new Date().toISOString() });
-            this.saveAllUserData();
-
-            // Si une option est active, gérer la réponse via cette option
-            if (this.currentOptionActive) {
-                await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 500));
-                this.handleOptionResponse(message);
-            } else {
-                // Sinon, générer une réponse libre via l'IA
-                const thinkingMsg = this.showThinking(); // Affiche les points de suspension
-                
-                // Désactive l'input et le bouton pendant que l'IA répond
-                this.journalInput.disabled = true; 
-                this.sendButton.disabled = true;
-                this.microphoneButton.disabled = true;
-
-                try {
-                    const response = await this.getJaneResponse(message); // Appel ASYNCHRONE à la fonction IA
+                if (response.ok) {
                     thinkingMsg.remove(); // Supprime les points de suspension
-                    this.addMessage(response, 'jane');
-                    this.conversationHistory.push({ sender: 'jane', message: response, timestamp: new Date().toISOString() });
-                    this.saveAllUserData();
-                    this.lastJaneResponse = response; // Met à jour la dernière réponse de Jane
-                } catch (error) {
-                    console.error('Erreur lors de la communication avec le chatbot :', error);
-                    thinkingMsg.remove(); // Supprime les points de suspension même en cas d'erreur
-                    // Message d'erreur utilisateur
-                    const errorMessage = this.janeResponses[this.currentLanguage].recognition.errorResponse || "Désolé, je n'ai pas pu générer de réponse pour le moment.";
-                    this.addMessage(errorMessage, 'jane');
-                    this.conversationHistory.push({ sender: 'jane', message: errorMessage, timestamp: new Date().toISOString() });
-                    this.saveAllUserData();
-                } finally {
-                    // Réactive l'input et le bouton après la réponse ou l'erreur
-                    this.journalInput.disabled = false;
-                    this.sendButton.disabled = false;
-                    this.microphoneButton.disabled = false;
-                    this.journalInput.focus(); // Remet le focus sur le champ de saisie
+                    const janeReply = data.reply;
+                    this.addJaneMessage(janeReply);
+                    this.conversationHistory.push({ sender: 'jane', message: janeReply, timestamp: new Date().toISOString() });
+                    this.saveAllUserData(); // Sauvegarde toutes les données (conversation et journal secret)
+                    this.showMainOptions(); // Réaffiche les options après la réponse de l'IA
+                } else {
+                    throw new Error(data.message || 'Unknown error from API');
                 }
+            } catch (error) {
+                console.error('Erreur lors de la communication avec le chatbot :', error);
+                thinkingMsg.remove(); // Supprime les points de suspension même en cas d'erreur
+                // Message d'erreur utilisateur
+                const errorMessage = this.janeResponses[this.currentLanguage].recognition.errorResponse || "Désolé, il y a eu un problème technique. Veuillez réessayer plus tard.";
+                this.addMessage(errorMessage, 'jane');
+                this.conversationHistory.push({ sender: 'jane', message: errorMessage, timestamp: new Date().toISOString() });
+                this.saveAllUserData();
             }
         }
 
-        loadConversationHistory() {
-            const history = JSON.parse(localStorage.getItem(`conversationHistory_${this.currentUser.username}`) || '[]');
-            this.conversationHistory = history; // Charge l'historique complet
-            this.messagesContainer.innerHTML = ''; // Vide l'affichage actuel
-            history.forEach(entry => {
-                this.addMessage(entry.message, entry.sender);
-            });
-            this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight; // Scroll vers le bas
-        }
-
-        saveAllUserData() {
-            // Sauvegarde l'historique de conversation de l'utilisateur actuel
-            localStorage.setItem(`conversationHistory_${this.currentUser.username}`, JSON.stringify(this.conversationHistory));
-            // Sauvegarde les entrées du carnet secret
-            localStorage.setItem(`journalEntries_${this.currentUser.username}`, JSON.stringify(this.currentUser.journalEntries || {}));
-        }
-
-        clearConversationHistory() {
-            if (confirm(this.janeResponses[this.currentLanguage].clearHistoryConfirmation)) {
-                this.conversationHistory = [];
-                localStorage.removeItem(`conversationHistory_${this.currentUser.username}`);
-                this.messagesContainer.innerHTML = ''; // Vide l'affichage
-                this.addMessage(this.janeResponses[this.currentLanguage].clearHistorySuccess, 'jane');
-            }
-        }
-
-        // --- RECONNAISSANCE VOCALE ---
+        // --- Reconnaissance Vocale ---
         toggleSpeechRecognition() {
             if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
                 if (!this.recognition) {
                     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                     this.recognition = new SpeechRecognition();
+                    this.recognition.continuous = false; // Arrête après chaque phrase
                     this.recognition.lang = this.currentLanguage === 'fr' ? 'fr-FR' : 'en-US';
                     this.recognition.interimResults = false;
-                    this.recognition.maxAlternatives = 1;
+
+                    this.recognition.onstart = () => {
+                        this.journalInput.placeholder = this.janeResponses[this.currentLanguage].recognition.listening;
+                        this.microphoneButton.classList.add('active');
+                    };
 
                     this.recognition.onresult = (event) => {
                         const transcript = event.results[0][0].transcript;
                         this.journalInput.value = transcript;
-                        this.handleSendMessage(); // Envoie le message transcrit
+                        this.sendMessage(); // Envoie le message dès que la reconnaissance est terminée
                     };
 
                     this.recognition.onerror = (event) => {
                         console.error('Speech recognition error:', event.error);
-                        this.addMessage(this.janeResponses[this.currentLanguage].recognition.error || 'Désolé, je n\'ai pas pu comprendre. Pouvez-vous répéter ?', 'jane');
+                        this.journalInput.placeholder = this.janeResponses[this.currentLanguage].recognition.defaultPlaceholder;
                         this.microphoneButton.classList.remove('active');
+                        if (event.error !== 'no-speech') {
+                            // N'affiche pas d'erreur si l'utilisateur n'a simplement rien dit
+                            this.addJaneMessage(this.janeResponses[this.currentLanguage].recognition.speechError);
+                        }
                     };
 
                     this.recognition.onend = () => {
-                        this.microphoneButton.classList.remove('active');
                         this.journalInput.placeholder = this.janeResponses[this.currentLanguage].recognition.defaultPlaceholder;
+                        this.microphoneButton.classList.remove('active');
                     };
                 }
 
                 if (this.microphoneButton.classList.contains('active')) {
                     this.recognition.stop();
-                    this.microphoneButton.classList.remove('active');
-                    this.journalInput.placeholder = this.janeResponses[this.currentLanguage].recognition.defaultPlaceholder;
                 } else {
                     this.recognition.start();
-                    this.microphoneButton.classList.add('active');
-                    this.journalInput.placeholder = this.janeResponses[this.currentLanguage].recognition.listeningPlaceholder;
                 }
             } else {
-                alert(this.janeResponses[this.currentLanguage].recognition.notSupported);
-                this.microphoneButton.disabled = true;
+                alert("Désolé, la reconnaissance vocale n'est pas prise en charge par votre navigateur.");
             }
         }
 
-        // --- GESTION DES OPTIONS INTERACTIVES ---
-        showMainOptions() {
-            this.janeOptionsContainer.innerHTML = '';
-            this.currentOptionActive = null;
-            this.optionStep = 0;
-
-            const options = this.janeResponses[this.currentLanguage].options.main;
-            options.forEach(option => {
-                const button = document.createElement('button');
-                button.classList.add('jane-option-button');
-                button.textContent = option.text;
-                button.dataset.optionId = option.id;
-                this.janeOptionsContainer.appendChild(button);
-            });
-            this.janeOptionsContainer.classList.remove('hidden');
-        }
-
-        handleOptionSelection(optionId) {
-            const option = this.janeResponses[this.currentLanguage].options.main.find(o => o.id === optionId);
-            if (option) {
-                this.addMessage(option.text, 'user'); // Affiche le choix de l'utilisateur
-                this.conversationHistory.push({ sender: 'user', message: option.text, timestamp: new Date().toISOString() });
-                this.saveAllUserData();
-
-                this.currentOptionActive = optionId;
-                this.optionStep = 0; // Réinitialise l'étape pour le dialogue
-                this.janeOptionsContainer.classList.add('hidden'); // Cache les options principales
-                this.handleOptionResponse(''); // Lance la première réponse de l'option
+        // --- Gestion de l'historique et des données utilisateur ---
+        saveAllUserData() {
+            if (this.currentUser) {
+                const users = JSON.parse(localStorage.getItem('users') || '{}');
+                const userIdentifier = `${this.currentUser.username}:${this.currentUser.pin}`;
+                if (users[userIdentifier]) {
+                    users[userIdentifier].conversationHistory = this.conversationHistory;
+                    // Assurez-vous que secretJournalEntries est également sauvegardé
+                    // Si des modifications sont faites directement dans secretJournalView, elles doivent être sauvegardées avant d'appeler saveAllUserData
+                    // Pour l'instant, on suppose que saveJournalEntry gère cela
+                    localStorage.setItem('users', JSON.stringify(users));
+                }
             }
         }
 
-        handleOptionResponse(userMessage) {
-            const optionDialogue = this.janeResponses[this.currentLanguage].options.dialogues[this.currentOptionActive];
-            if (optionDialogue && this.optionStep < optionDialogue.length) {
-                const step = optionDialogue[this.optionStep];
 
-                if (step.type === 'response') {
-                    this.addMessage(step.text, 'jane');
-                    this.conversationHistory.push({ sender: 'jane', message: step.text, timestamp: new Date().toISOString() });
-                    this.saveAllUserData();
-                    this.optionStep++;
-                    // Si c'est une simple réponse, avance au dialogue suivant ou termine
-                    if (this.optionStep < optionDialogue.length) {
-                        setTimeout(() => this.handleOptionResponse(''), 1000); // Prochaine étape du dialogue
-                    } else {
-                        setTimeout(() => this.showMainOptions(), 1500); // Retour aux options principales
-                    }
-                } else if (step.type === 'input_prompt') {
-                    // Pour l'instant, on se contente de demander un input, l'IA le gérera dans le mode libre
-                    this.addMessage(step.text, 'jane');
-                    this.conversationHistory.push({ sender: 'jane', message: step.text, timestamp: new Date().toISOString() });
-                    this.saveAllUserData();
-                    this.optionStep++;
-                    // Le dialogue s'interrompt ici en attendant l'entrée de l'utilisateur
-                    // Après l'entrée de l'utilisateur, handleSendMessage sera appelé, qui gérera l'IA
-                    // La logique de reprise du dialogue d'option doit être gérée par l'IA si elle est contextuelle
-                    // Ou simplement retourner aux options principales si c'est la fin du flow d'option
-                    setTimeout(() => {
-                        this.journalInput.focus();
-                        this.currentOptionActive = null; // Désactive l'option pour la conversation libre
-                        this.showMainOptions(); // Retourne aux options principales
-                    }, 1000);
-                } else if (step.type === 'options') {
-                    this.janeOptionsContainer.innerHTML = '';
-                    step.options.forEach(opt => {
-                        const button = document.createElement('button');
-                        button.classList.add('jane-option-button');
-                        button.textContent = opt.text;
-                        button.dataset.optionId = opt.id;
-                        this.janeOptionsContainer.appendChild(button);
+        loadConversationHistory() {
+            this.messagesContainer.innerHTML = ''; // Clear current display
+            if (this.currentUser) {
+                const users = JSON.parse(localStorage.getItem('users') || '{}');
+                const userIdentifier = `${this.currentUser.username}:${this.currentUser.pin}`;
+                if (users[userIdentifier] && users[userIdentifier].conversationHistory) {
+                    this.conversationHistory = users[userIdentifier].conversationHistory;
+                    this.conversationHistory.forEach(msg => {
+                        this.addMessage(msg.message, msg.sender);
                     });
-                    this.janeOptionsContainer.classList.remove('hidden');
-                    // Gérer la sélection de ces sous-options
-                    this.optionStep++; // Avance l'étape pour le prochain appel
+                } else {
+                    this.conversationHistory = [];
+                    this.addJaneMessage(this.janeResponses[this.currentLanguage].journal.welcomeMessage.replace('[NomUtilisateur]', this.currentUser.username));
                 }
             } else {
-                // Fin du dialogue d'option, revenir aux options principales
-                this.currentOptionActive = null;
-                this.optionStep = 0;
-                this.showMainOptions();
+                this.conversationHistory = [];
+            }
+            this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight; // Scroll to bottom
+        }
+
+        clearConversationHistory() {
+            if (confirm(this.janeResponses[this.currentLanguage].journal.clearHistoryConfirm)) {
+                this.conversationHistory = [];
+                this.messagesContainer.innerHTML = ''; // Clear display
+                this.saveAllUserData(); // Save empty history
+                this.addJaneMessage(this.janeResponses[this.currentLanguage].journal.clearedHistory);
+                this.showMainOptions(); // Réaffiche les options
             }
         }
 
-
-        // --- Fonctions d'Intelligence et de Mémoire ---
-
-        formatConversationHistoryForAI() {
-            // Convertit l'historique de conversation du format local au format attendu par l'API OpenAI
-            return this.conversationHistory.map(entry => {
-                return {
-                    role: entry.sender === 'user' ? 'user' : 'assistant',
-                    content: entry.message
-                };
-            });
-        }
-
-        // --- CORE INTELLIGENCE DE JANE (via API OpenAI) ---
-        async getJaneResponse(userMessage) {
-            try {
-                // Utilise la fonction utilitaire pour formater l'historique
-                const formattedHistory = this.formatConversationHistoryForAI();
-
-                // Ajoute le message actuel de l'utilisateur à l'historique formaté pour l'envoi
-                // Note : le message de l'utilisateur est déjà dans this.conversationHistory à ce point
-                // mais on le met à jour pour l'envoi à l'IA avec le bon format.
-                const messagesToSend = [...formattedHistory, { role: 'user', content: userMessage }];
-
-                const response = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        userMessage: userMessage, // Le message actuel de l'utilisateur
-                        conversationHistory: messagesToSend // L'historique complet formaté
-                    })
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(`Erreur du serveur IA: ${response.status} - ${errorData.error || response.statusText}`);
-                }
-
-                const data = await response.json();
-                return data.reply; // La réponse de l'IA est dans `data.reply`
-
-            } catch (error) {
-                console.error('Erreur lors de la communication avec le chatbot :', error);
-                // Retourne une réponse d'erreur par défaut ou spécifique si l'API échoue
-                return this.janeResponses[this.currentLanguage].recognition.errorResponse || "Désolé, je n'ai pas pu générer de réponse pour le moment.";
-            }
-        }
-
-
-        // --- GESTION DU CARNET SECRET ---
-        loadJournalEntries() {
-            this.currentUser.journalEntries = JSON.parse(localStorage.getItem(`journalEntries_${this.currentUser.username}`) || '{}');
-        }
-
-        saveJournalEntry() {
-            const currentDate = this.currentDateDisplay.dataset.date; // Récupère la date affichée
-            const entryText = this.journalEntryText.value.trim();
-
-            if (!this.currentUser.journalEntries) {
-                this.currentUser.journalEntries = {};
-            }
-
-            if (entryText) {
-                this.currentUser.journalEntries[currentDate] = entryText;
-                localStorage.setItem(`journalEntries_${this.currentUser.username}`, JSON.stringify(this.currentUser.journalEntries));
-                alert(this.janeResponses[this.currentLanguage].secretJournal.entrySaved);
-            } else {
-                delete this.currentUser.journalEntries[currentDate]; // Supprime l'entrée si le texte est vide
-                localStorage.setItem(`journalEntries_${this.currentUser.username}`, JSON.stringify(this.currentUser.journalEntries));
-                alert(this.janeResponses[this.currentLanguage].secretJournal.entryCleared);
-            }
-            this.displayJournalEntriesByDate(); // Met à jour la liste des dates avec entrées
-        }
-
+        // --- Journal Secret ---
         showSecretJournal() {
             this.journalApp.classList.add('hidden');
             this.secretJournalView.classList.remove('hidden');
-            this.setCurrentJournalDate(new Date()); // Affiche la date du jour par défaut
+            this.secretJournalView.querySelector('h2').textContent = this.janeResponses[this.currentLanguage].journal.secretJournalTitle;
+            this.journalEntryText.placeholder = this.janeResponses[this.currentLanguage].journal.secretJournalPlaceholder;
+            this.saveEntryButton.textContent = this.janeResponses[this.currentLanguage].journal.saveButton;
+            this.journalEntryText.value = ''; // Clear text area for new entry
+            this.currentDate = new Date(); // Set to current date initially
             this.displayJournalEntriesByDate();
+            this.loadJournalEntryForDate(this.formatDate(this.currentDate)); // Load entry for current date
         }
 
         hideSecretJournal() {
             this.secretJournalView.classList.add('hidden');
             this.journalApp.classList.remove('hidden');
-            this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight; // Scroll vers le bas
-            this.journalInput.focus();
+            this.showMainOptions(); // Réaffiche les options
         }
 
-        setCurrentJournalDate(date) {
-            const yyyy = date.getFullYear();
-            const mm = String(date.getMonth() + 1).padStart(2, '0'); // Mois commence à 0
-            const dd = String(date.getDate()).padStart(2, '0');
-            const formattedDate = `${yyyy}-${mm}-${dd}`;
-
-            this.currentDateDisplay.textContent = this.formatDateForDisplay(date, this.currentLanguage);
-            this.currentDateDisplay.dataset.date = formattedDate; // Stocke la date formatée pour la sauvegarde
-            this.journalEntryText.value = this.currentUser.journalEntries[formattedDate] || '';
-            this.journalEntryText.focus();
+        formatDate(date) {
+            return date.toLocaleDateString(this.currentLanguage === 'fr' ? 'fr-FR' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' });
         }
 
-        navigateJournalDay(offset) {
-            const currentDate = new Date(this.currentDateDisplay.dataset.date);
-            currentDate.setDate(currentDate.getDate() + offset);
-            this.setCurrentJournalDate(currentDate);
+        getJournalData() {
+            const users = JSON.parse(localStorage.getItem('users') || '{}');
+            const userIdentifier = `${this.currentUser.username}:${this.currentUser.pin}`;
+            return users[userIdentifier]?.secretJournalEntries || {};
         }
 
-        formatDateForDisplay(date, lang) {
-            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-            if (lang === 'fr') {
-                return date.toLocaleDateString('fr-FR', options);
-            } else {
-                return date.toLocaleDateString('en-US', options);
+        setJournalData(data) {
+            const users = JSON.parse(localStorage.getItem('users') || '{}');
+            const userIdentifier = `${this.currentUser.username}:${this.currentUser.pin}`;
+            if (!users[userIdentifier]) {
+                users[userIdentifier] = {};
             }
+            users[userIdentifier].secretJournalEntries = data;
+            localStorage.setItem('users', JSON.stringify(users));
+        }
+
+
+        loadJournalEntryForDate(dateString) {
+            this.currentDateDisplay.textContent = dateString; // Update date display
+            const journalData = this.getJournalData();
+            this.journalEntryText.value = journalData[dateString] || '';
+        }
+
+        saveJournalEntry() {
+            const dateString = this.formatDate(this.currentDate);
+            const entryContent = this.journalEntryText.value.trim();
+            const journalData = this.getJournalData();
+
+            if (entryContent) {
+                journalData[dateString] = entryContent;
+            } else {
+                delete journalData[dateString]; // Remove if empty
+            }
+
+            this.setJournalData(journalData);
+            alert(this.janeResponses[this.currentLanguage].journal.entrySaved);
+            this.displayJournalEntriesByDate(); // Refresh list of entries
+        }
+
+        changeJournalDate(offset) {
+            this.currentDate.setDate(this.currentDate.getDate() + offset);
+            const newDateString = this.formatDate(this.currentDate);
+            this.loadJournalEntryForDate(newDateString);
         }
 
         displayJournalEntriesByDate() {
             this.journalEntriesContainer.innerHTML = '';
-            const entries = this.currentUser.journalEntries || {};
-            const dates = Object.keys(entries).sort((a, b) => new Date(b) - new Date(a)); // Tri descendant
+            const journalData = this.getJournalData();
+            const sortedDates = Object.keys(journalData).sort((a, b) => new Date(b) - new Date(a)); // Sort descending
 
-            if (dates.length === 0) {
-                this.journalEntriesContainer.innerHTML = `<p>${this.janeResponses[this.currentLanguage].secretJournal.noEntries}</p>`;
+            if (sortedDates.length === 0) {
+                const noEntriesItem = document.createElement('li');
+                noEntriesItem.textContent = this.janeResponses[this.currentLanguage].journal.noEntries;
+                this.journalEntriesContainer.appendChild(noEntriesItem);
                 return;
             }
 
-            dates.forEach(dateStr => {
-                const date = new Date(dateStr);
+            sortedDates.forEach(dateString => {
                 const listItem = document.createElement('li');
                 listItem.classList.add('journal-entry-item');
-
-                const dateLink = document.createElement('a');
-                dateLink.href = "#";
-                dateLink.textContent = this.formatDateForDisplay(date, this.currentLanguage);
-                dateLink.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    this.setCurrentJournalDate(date);
-                });
-
-                listItem.appendChild(dateLink);
+                const link = document.createElement('a');
+                link.href = '#';
+                link.dataset.date = dateString;
+                link.textContent = dateString;
+                listItem.appendChild(link);
                 this.journalEntriesContainer.appendChild(listItem);
             });
         }
 
-        // --- LOCALISATION ---
-        loadJaneResponses() {
-            // Vos réponses et textes localisés
-            return {
-                fr: {
-                    auth: {
-                        welcome: "Bienvenue sur Jane. Connectez-vous ou créez un compte.",
-                        usernamePlaceholder: "Nom d'utilisateur",
-                        pinPlaceholder: "PIN",
-                        unlockButton: "Déverrouiller",
-                        emptyFields: "Veuillez remplir tous les champs.",
-                        invalidPin: "PIN incorrect. Veuillez réessayer."
-                    },
-                    recognition: {
-                        defaultPlaceholder: "Écrivez votre pensée ou utilisez le micro...",
-                        listeningPlaceholder: "J'écoute...",
-                        error: "Désolé, je n'ai pas pu comprendre. Pouvez-vous répéter ?",
-                        notSupported: "La reconnaissance vocale n'est pas supportée par votre navigateur.",
-                        errorResponse: "Désolé, il y a eu un problème technique. Veuillez réessayer plus tard."
-                    },
-                    clearHistoryConfirmation: "Êtes-vous sûr de vouloir effacer tout l'historique de conversation avec Jane ?",
-                    clearHistorySuccess: "Historique de conversation effacé.",
-                    options: {
-                        main: [
-                            { id: 'gratitude', text: "Exprimer ma gratitude" },
-                            { id: 'reflection', text: "Réfléchir à ma journée" },
-                            { id: 'feeling', text: "Parler de mes émotions" },
-                            { id: 'memory', text: "Me souvenir de quelque chose" }
-                        ],
-                        dialogues: {
-                            gratitude: [
-                                { type: 'response', text: "Merveilleux ! Exprimer sa gratitude est une excellente façon de cultiver le bonheur. Qu'est-ce qui vous a apporté de la joie aujourd'hui ?" },
-                                { type: 'input_prompt', text: "Racontez-moi en quelques mots." }
-                            ],
-                            reflection: [
-                                { type: 'response', text: "La réflexion est la clé de la croissance. Racontez-moi ce qui vous a marqué aujourd'hui. Y a-t-il eu un événement particulier ?" },
-                                { type: 'input_prompt', text: "Partagez vos pensées." }
-                            ],
-                            feeling: [
-                                { type: 'response', text: "Je suis là pour vous écouter. Comment vous sentez-vous en ce moment ? N'hésitez pas à exprimer ce qui est sur votre cœur." },
-                                { type: 'input_prompt', text: "Décrivez vos émotions." }
-                            ],
-                            memory: [
-                                { type: 'response', text: "Les souvenirs sont précieux. Y a-t-il un moment récent ou ancien que vous aimeriez vous remémorer ou partager ?" },
-                                { type: 'input_prompt', text: "Racontez-moi ce souvenir." }
-                            ]
-                        }
-                    },
-                    secretJournal: {
-                        entrySaved: "Entrée sauvegardée avec succès !",
-                        entryCleared: "Entrée effacée.",
-                        noEntries: "Aucune entrée pour le moment."
-                    }
-                },
-                en: {
-                    auth: {
-                        welcome: "Welcome to Jane. Log in or create an account.",
-                        usernamePlaceholder: "Username",
-                        pinPlaceholder: "PIN",
-                        unlockButton: "Unlock",
-                        emptyFields: "Please fill in all fields.",
-                        invalidPin: "Incorrect PIN. Please try again."
-                    },
-                    recognition: {
-                        defaultPlaceholder: "Write your thoughts or use the mic...",
-                        listeningPlaceholder: "Listening...",
-                        error: "Sorry, I couldn't understand. Can you repeat?",
-                        notSupported: "Speech recognition is not supported by your browser.",
-                        errorResponse: "Sorry, there was a technical issue. Please try again later."
-                    },
-                    clearHistoryConfirmation: "Are you sure you want to clear all conversation history with Jane?",
-                    clearHistorySuccess: "Conversation history cleared.",
-                    options: {
-                        main: [
-                            { id: 'gratitude', text: "Express gratitude" },
-                            { id: 'reflection', text: "Reflect on my day" },
-                            { id: 'feeling', text: "Talk about my emotions" },
-                            { id: 'memory', text: "Recall something" }
-                        ],
-                        dialogues: {
-                            gratitude: [
-                                { type: 'response', text: "Wonderful! Expressing gratitude is a great way to cultivate happiness. What brought you joy today?" },
-                                { type: 'input_prompt', text: "Tell me in a few words." }
-                            ],
-                            reflection: [
-                                { type: 'response', text: "Reflection is key to growth. Tell me what stood out to you today. Was there a particular event?" },
-                                { type: 'input_prompt', text: "Share your thoughts." }
-                            ],
-                            feeling: [
-                                { type: 'response', text: "I'm here to listen. How are you feeling right now? Feel free to express what's on your heart." },
-                                { type: 'input_prompt', text: "Describe your emotions." }
-                            ],
-                            memory: [
-                                { type: 'response', text: "Memories are precious. Is there a recent or old moment you'd like to recall or share?" },
-                                { type: 'input_prompt', text: "Tell me about this memory." }
-                            ]
-                        }
-                    },
-                    secretJournal: {
-                        entrySaved: "Entry saved successfully!",
-                        entryCleared: "Entry cleared.",
-                        noEntries: "No entries yet."
-                    }
-                }
-            };
+        // --- Options Interactives de Jane ---
+        showMainOptions() {
+            this.janeOptionsDiv.innerHTML = ''; // Clear previous options
+            this.janeOptionsDiv.classList.remove('hidden');
+            this.optionStep = 0; // Reset pour revenir au début des options
+            this.displayOptions('initial');
         }
 
-        changeLanguage(lang) {
-            this.currentLanguage = lang;
-            localStorage.setItem('janeLanguage', lang);
-            this.updateAuthScreenText(lang);
-            this.updateJournalText(lang);
-            if (this.recognition) {
-                this.recognition.lang = lang === 'fr' ? 'fr-FR' : 'en-US';
+        displayOptions(optionKey) {
+            this.janeOptionsDiv.innerHTML = '';
+            const currentOptions = this.janeResponses[this.currentLanguage].options[optionKey];
+            if (!currentOptions) {
+                console.error('Invalid option key:', optionKey);
+                return;
             }
-            this.loadConversationHistory(); // Recharge l'historique pour s'assurer que les dates/heures sont affichées dans la nouvelle langue
-            this.showMainOptions(); // Réaffiche les options dans la nouvelle langue
-            // Si le carnet secret est ouvert, le mettre à jour aussi
-            if (!this.secretJournalView.classList.contains('hidden')) {
-                this.displayJournalEntriesByDate();
+
+            // Ajoute la question de Jane pour les options
+            this.addJaneMessage(currentOptions.prompt);
+
+            currentOptions.options.forEach(option => {
+                const button = document.createElement('button');
+                button.classList.add('jane-option-button');
+                button.textContent = option.text;
+                button.dataset.action = option.action;
+                button.addEventListener('click', () => this.handleOptionClick(option.action));
+                this.janeOptionsDiv.appendChild(button);
+            });
+            this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+        }
+
+        handleOptionClick(action) {
+            // Pour les actions de "retour", on affiche l'étape précédente sans ajouter au chat
+            if (action === "back") {
+                this.displayOptions(this.getLastOptionKey()); // Remonte d'une étape logique
+            } else {
+                // Pour les autres actions, on ajoute la sélection de l'utilisateur au chat
+                const selectedOptionText = event.target.textContent;
+                this.addUserMessage(selectedOptionText);
+                // Stocke l'action actuelle pour un éventuel suivi
+                this.currentOptionActive = action;
+                this.displayOptions(action); // Affiche les options liées à l'action
             }
         }
 
-        updateAuthScreenText(lang) {
-            const authMessages = this.janeResponses[lang].auth;
-            this.authMessage.textContent = authMessages.welcome;
-            this.usernameInput.placeholder = authMessages.usernamePlaceholder;
-            this.pinInput.placeholder = authMessages.pinPlaceholder;
-            this.unlockButton.querySelector('.button-text').textContent = authMessages.unlockButton;
+        // Simple fonction pour remonter d'une étape dans les options (peut être améliorée)
+        getLastOptionKey() {
+            const currentLanguageOptions = this.janeResponses[this.currentLanguage].options;
+            // Logique simplifiée : toujours revenir à "initial" pour l'instant
+            // Une implémentation plus robuste nécessiterait un suivi de l'historique des chemins d'options
+            return 'initial';
         }
 
-        updateJournalText(lang) {
-            this.journalInput.placeholder = this.janeResponses[this.currentLanguage].recognition.defaultPlaceholder;
-        }
     }
 
     // Initialisation de l'application
